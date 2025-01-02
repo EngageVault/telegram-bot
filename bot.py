@@ -9,7 +9,7 @@ import logging
 import platform
 import asyncio
 from typing import Final
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -26,11 +26,14 @@ logger = logging.getLogger(__name__)
 
 # Constants
 TOKEN: Final = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
+COMMUNITY_URL: Final = "https://t.me/engagevaultcommunity"
+APP_URL: Final = "https://engagevault.com"  # À remplacer par l'URL de votre future app
+
 WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
 
-You've just discovered the next big thing in social media growth - and you're among the first to join! 🎯
+You've just discovered the next big thing in social media growth, and you're among the first to join! 🎯
 
 💎 Being an early member means:
 • EXCLUSIVE ACCESS to premium features
@@ -48,15 +51,35 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
+def create_buttons() -> InlineKeyboardMarkup:
+    """Crée les boutons inline avec les URLs"""
+    keyboard = [
+        [
+            InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)
+        ],
+        [
+            InlineKeyboardButton("🚀 Launch App", url=APP_URL)
+        ]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 async def start_command(update: Update, context: CallbackContext) -> None:
     """
     Handler for the /start command.
-    Sends a welcome message to the user.
+    Sends a welcome message to the user with inline buttons.
     """
     try:
         user = update.effective_user
         logger.info(f"User {user.id} started the bot")
-        await update.message.reply_text(WELCOME_MESSAGE)
+        
+        # Créer les boutons
+        buttons = create_buttons()
+        
+        # Envoyer le message avec les boutons
+        await update.message.reply_text(
+            text=WELCOME_MESSAGE,
+            reply_markup=buttons
+        )
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
         await update.message.reply_text("An error occurred. Please try again later.")
