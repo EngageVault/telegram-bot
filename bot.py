@@ -1,11 +1,32 @@
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-import asyncio
-import platform
-import os
+"""
+EngageVault Telegram Bot
+------------------------
+A professional Telegram bot for EngageVault platform.
+"""
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    welcome_message = """🚀 Welcome to EngageVault!
+import os
+import logging
+import platform
+import asyncio
+from typing import Final
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    CallbackContext
+)
+
+# Configuration du logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
+
+# Constants
+TOKEN: Final = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
+WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
 
@@ -27,26 +48,64 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-    await update.message.reply_text(welcome_message)
+async def start_command(update: Update, context: CallbackContext) -> None:
+    """
+    Handler for the /start command.
+    Sends a welcome message to the user.
+    """
+    try:
+        user = update.effective_user
+        logger.info(f"User {user.id} started the bot")
+        await update.message.reply_text(WELCOME_MESSAGE)
+    except Exception as e:
+        logger.error(f"Error in start command: {str(e)}")
+        await update.message.reply_text("An error occurred. Please try again later.")
 
-def main():
-    # Configuration de la politique d'événements pour Windows
-    if platform.system() == "Windows":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """
+    Handler for bot errors.
+    Logs errors and notifies users if necessary.
+    """
+    logger.error(f"Update {update} caused error {context.error}")
 
-    # Récupération du token depuis les variables d'environnement
-    token = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
-    
-    # Création de l'application
-    app = Application.builder().token(token).build()
-    
-    # Ajout du gestionnaire de commande
-    app.add_handler(CommandHandler("start", start))
-    
-    # Lancement du bot
-    print("Le bot démarre...")
-    app.run_polling()
-    print("Bot arrêté")
+def init_bot() -> Application:
+    """
+    Initializes and configures the bot application.
+    Returns the configured application instance.
+    """
+    try:
+        app = Application.builder().token(TOKEN).build()
+        
+        # Add command handlers
+        app.add_handler(CommandHandler("start", start_command))
+        
+        # Add error handler
+        app.add_error_handler(error_handler)
+        
+        return app
+    except Exception as e:
+        logger.critical(f"Failed to initialize bot: {str(e)}")
+        raise
+
+async def main() -> None:
+    """
+    Main function to run the bot.
+    """
+    try:
+        logger.info("Starting bot...")
+        app = init_bot()
+        await app.initialize()
+        await app.start()
+        await app.run_polling()
+    except Exception as e:
+        logger.critical(f"Critical error: {str(e)}")
+    finally:
+        logger.info("Bot stopped")
 
 if __name__ == "__main__":
-    main()
+    # Configure event loop policy for Windows
+    if platform.system() == "Windows":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    
+    # Run the bot
+    asyncio.run(main())
