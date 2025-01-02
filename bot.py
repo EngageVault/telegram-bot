@@ -63,42 +63,39 @@ Join now before regular rates apply! 🎁
 Ready to multiply your social growth? Tap below! 👇"""
 
 def start(update: Update, context: CallbackContext):
+    logger.info("Commande /start reçue")
     try:
-        # Incrémenter le compteur
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        cur.execute('UPDATE stats SET total_starts = total_starts + 1')
-        conn.commit()
-        cur.close()
-        conn.close()
+        keyboard = [
+            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
+            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
+        ]
+        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
+        logger.info("Message de bienvenue envoyé")
         
-        keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
-        ]
-        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
-        logger.info("Message envoyé avec succès")
+        # Essayer d'enregistrer dans la BD seulement après avoir envoyé le message
+        try:
+            conn = psycopg2.connect(DATABASE_URL)
+            cur = conn.cursor()
+            cur.execute('UPDATE stats SET total_starts = total_starts + 1')
+            conn.commit()
+            cur.close()
+            conn.close()
+            logger.info("Statistiques mises à jour")
+        except Exception as db_error:
+            logger.error(f"Erreur BD dans start: {str(db_error)}")
+            
     except Exception as e:
-        logger.error(f"Erreur dans start: {str(e)}")
-        # Envoyer quand même le message si la BD échoue
-        keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
-        ]
-        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
+        logger.error(f"Erreur générale dans start: {str(e)}")
 
 def get_stats(update: Update, context: CallbackContext):
-    logger.info("Commande stats reçue")
-    user_id = update.effective_user.id
-    logger.info(f"ID utilisateur: {user_id}")
+    logger.info(f"Commande /stats reçue de l'utilisateur {update.effective_user.id}")
     
-    if user_id != ADMIN_ID:
-        logger.warning(f"Accès non autorisé de l'utilisateur {user_id}")
+    if update.effective_user.id != ADMIN_ID:
+        logger.warning("Tentative d'accès non autorisée aux stats")
         update.message.reply_text("⛔ You don't have permission to use this command.")
         return
-
+        
     try:
-        logger.info("Tentative de connexion à la base de données pour stats")
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute('SELECT total_starts FROM stats')
@@ -109,18 +106,20 @@ def get_stats(update: Update, context: CallbackContext):
         
         update.message.reply_text(f"📊 Total /start commands: {total}")
     except Exception as e:
-        logger.error(f"Erreur stats: {str(e)}")
+        logger.error(f"Erreur dans get_stats: {str(e)}")
         update.message.reply_text("❌ Error getting statistics")
 
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
-    if init_db():
+    try:
         updater = Updater(TOKEN)
         updater.dispatcher.add_handler(CommandHandler("start", start))
         updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
-        logger.info("Bot prêt à démarrer")
+        logger.info("Handlers ajoutés")
+        
+        logger.info("Démarrage du polling...")
         updater.start_polling()
-        logger.info("Bot démarré")
+        logger.info("Bot démarré avec succès")
         updater.idle()
-    else:
-        logger.error("Erreur d'initialisation de la base de données")
+    except Exception as e:
+        logger.error(f"Erreur critique au démarrage: {str(e)}")
