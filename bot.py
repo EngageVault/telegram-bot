@@ -1,16 +1,17 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackContext, CallbackQueryHandler
 import os
 from datetime import datetime
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
-ADMIN_ID = 7686799533  # Votre ID Telegram
+ADMIN_ID = 7686799533
 
 # Dictionnaires pour stocker les statistiques
 users = {}
 stats = {
     'total_starts': 0,
-    'unique_users': 0
+    'unique_users': 0,
+    'launch_app_clicks': 0
 }
 
 WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
@@ -44,22 +45,31 @@ def start(update: Update, context: CallbackContext):
         users[user_id] = {
             'username': username,
             'first_seen': datetime.now(),
-            'commands_used': 0
+            'commands_used': 0,
+            'launch_app_clicks': 0
         }
         stats['unique_users'] += 1
     
     users[user_id]['commands_used'] += 1
 
     keyboard = [
-        [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-        [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
+        [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity", callback_data="join_community")],
+        [InlineKeyboardButton("🚀 Launch App", url="https://google.com", callback_data="launch_app")]
     ]
     update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
+
+def button_click(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    if query.data == "launch_app":
+        stats['launch_app_clicks'] += 1
+        if user_id in users:
+            users[user_id]['launch_app_clicks'] += 1
 
 def get_stats(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     
-    # Vérifie si l'utilisateur est admin
     if user_id != ADMIN_ID:
         update.message.reply_text("⛔ You don't have permission to use this command.")
         return
@@ -68,12 +78,14 @@ def get_stats(update: Update, context: CallbackContext):
 
 Total /start commands: {stats['total_starts']}
 Unique users: {stats['unique_users']}
+Total Launch App clicks: {stats['launch_app_clicks']}
+
 Most active users:"""
 
     sorted_users = sorted(users.items(), key=lambda x: x[1]['commands_used'], reverse=True)[:5]
     
     for user_id, user_data in sorted_users:
-        stats_message += f"\n@{user_data['username']}: {user_data['commands_used']} commands"
+        stats_message += f"\n@{user_data['username']}: {user_data['commands_used']} commands, {user_data['launch_app_clicks']} app clicks"
 
     update.message.reply_text(stats_message)
 
@@ -81,5 +93,6 @@ if __name__ == '__main__':
     updater = Updater(TOKEN)
     updater.dispatcher.add_handler(CommandHandler("start", start))
     updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
+    updater.dispatcher.add_handler(CallbackQueryHandler(button_click))
     updater.start_polling()
     updater.idle()
