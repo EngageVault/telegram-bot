@@ -1,7 +1,8 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext
+import os
 
-TOKEN = "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg"
+TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
 
 WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
 
@@ -25,19 +26,15 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-def start(update: Update, context: CallbackContext) -> None:
+def start(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
         [InlineKeyboardButton("🚀 Launch App", url="https://test.com")]
     ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text(text=WELCOME_MESSAGE, reply_markup=reply_markup)
+    update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
 
-def main() -> None:
+if __name__ == '__main__':
     updater = Updater(TOKEN)
     updater.dispatcher.add_handler(CommandHandler("start", start))
     updater.start_polling()
     updater.idle()
-
-if __name__ == '__main__':
-    main()
