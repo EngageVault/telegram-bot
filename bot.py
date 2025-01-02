@@ -2,6 +2,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 import asyncio
 import platform
+import os
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_message = """🚀 Welcome to EngageVault!
@@ -33,8 +34,11 @@ def main():
     if platform.system() == "Windows":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+    # Récupération du token depuis les variables d'environnement
+    token = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
+    
     # Création de l'application
-    app = Application.builder().token("7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg").build()
+    app = Application.builder().token(token).build()
     
     # Ajout du gestionnaire de commande
     app.add_handler(CommandHandler("start", start))
