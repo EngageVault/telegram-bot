@@ -29,7 +29,7 @@ Ready to multiply your social growth? Tap below! 👇"""
 def start(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-        [InlineKeyboardButton("🚀 Launch App", url="https://test")]
+        [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
     ]
     update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
 
