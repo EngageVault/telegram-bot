@@ -3,40 +3,53 @@ from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
 import psycopg2
 from datetime import datetime
+import logging
+
+# Configuration du logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
 ADMIN_ID = 7686799533
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 def init_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-    
-    # Création de la table users si elle n'existe pas
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            user_id BIGINT PRIMARY KEY,
-            username TEXT,
-            first_seen TIMESTAMP,
-            commands_used INTEGER DEFAULT 0
-        )
-    ''')
-    
-    # Création de la table stats si elle n'existe pas
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS stats (
-            id SERIAL PRIMARY KEY,
-            total_starts INTEGER DEFAULT 0,
-            unique_users INTEGER DEFAULT 0
-        )
-    ''')
-    
-    # Initialiser stats s'il n'existe pas
-    cur.execute('INSERT INTO stats (total_starts, unique_users) SELECT 0, 0 WHERE NOT EXISTS (SELECT 1 FROM stats)')
-    
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        logger.info("Tentative de connexion à la base de données...")
+        logger.info(f"DATABASE_URL: {DATABASE_URL}")
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Création des tables
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id BIGINT PRIMARY KEY,
+                username TEXT,
+                first_seen TIMESTAMP,
+                commands_used INTEGER DEFAULT 0
+            )
+        ''')
+        
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS stats (
+                id SERIAL PRIMARY KEY,
+                total_starts INTEGER DEFAULT 0,
+                unique_users INTEGER DEFAULT 0
+            )
+        ''')
+        
+        cur.execute('INSERT INTO stats (total_starts, unique_users) SELECT 0, 0 WHERE NOT EXISTS (SELECT 1 FROM stats)')
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+        logger.info("Base de données initialisée avec succès")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'initialisation de la base de données: {e}")
+        raise e
 
 WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
 
