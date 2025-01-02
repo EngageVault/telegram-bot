@@ -1,35 +1,23 @@
 """
 EngageVault Telegram Bot
-------------------------
-A professional Telegram bot for EngageVault platform.
 """
 
 import os
 import logging
-import platform
-import asyncio
-from typing import Final
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes,
-    CallbackContext
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
 
 # Configuration du logging
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(__name__)
 
-# Constants
-TOKEN: Final = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
-COMMUNITY_URL: Final = "https://t.me/engagevaultcommunity"
-APP_URL: Final = "https://engagevault.com"
+# Token du bot
+TOKEN = "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg"
 
-WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
+# Messages et URLs
+WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
 
@@ -51,75 +39,31 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-async def start_command(update: Update, context: CallbackContext) -> None:
-    """
-    Handler for the /start command.
-    Sends a welcome message to the user with inline buttons.
-    """
-    try:
-        # Créer les boutons inline
-        keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)],
-            [InlineKeyboardButton("🚀 Launch App", url=APP_URL)]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Gestionnaire de la commande /start"""
+    keyboard = [
+        [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
+        [InlineKeyboardButton("🚀 Launch App", url="https://engagevault.com")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        text=WELCOME_MESSAGE,
+        reply_markup=reply_markup
+    )
 
-        # Envoyer le message avec les boutons
-        await update.message.reply_text(
-            text=WELCOME_MESSAGE,
-            reply_markup=reply_markup
-        )
-        
-    except Exception as e:
-        logger.error(f"Error in start command: {str(e)}")
-        await update.message.reply_text("An error occurred. Please try again later.")
+def main():
+    """Fonction principale"""
+    # Créer l'application
+    app = Application.builder().token(TOKEN).build()
 
-async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """
-    Handler for bot errors.
-    Logs errors and notifies users if necessary.
-    """
-    logger.error(f"Update {update} caused error {context.error}")
+    # Ajouter le gestionnaire de commande
+    app.add_handler(CommandHandler("start", start))
 
-def init_bot() -> Application:
-    """
-    Initializes and configures the bot application.
-    Returns the configured application instance.
-    """
-    try:
-        # Ajout du drop_pending_updates=True pour éviter les conflits
-        app = Application.builder().token(TOKEN).arbitrary_callback_data(True).drop_pending_updates(True).build()
-        
-        # Add command handlers
-        app.add_handler(CommandHandler("start", start_command))
-        
-        # Add error handler
-        app.add_error_handler(error_handler)
-        
-        return app
-    except Exception as e:
-        logger.critical(f"Failed to initialize bot: {str(e)}")
-        raise
-
-async def main() -> None:
-    """
-    Main function to run the bot.
-    """
-    try:
-        logger.info("Starting bot...")
-        app = init_bot()
-        await app.initialize()
-        await app.start()
-        await app.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        logger.critical(f"Critical error: {str(e)}")
-    finally:
-        logger.info("Bot stopped")
+    # Démarrer le bot
+    print("Le bot démarre...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    print("Bot arrêté")
 
 if __name__ == "__main__":
-    # Configure event loop policy for Windows
-    if platform.system() == "Windows":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    
-    # Run the bot
-    asyncio.run(main())
+    main()
