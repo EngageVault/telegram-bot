@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import io
 import subprocess
+import seaborn as sns
+from collections import defaultdict
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -750,6 +752,91 @@ def restore_file(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
+def analyze_peak_hours(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer les heures d'activité
+        cur.execute('''
+            SELECT 
+                EXTRACT(HOUR FROM created_at) as hour,
+                COUNT(*) as count
+            FROM feedbacks
+            WHERE created_at >= NOW() - INTERVAL '30 days'
+            GROUP BY hour
+            ORDER BY hour
+        ''')
+        
+        hours_data = cur.fetchall()
+        
+        # Préparer les données
+        hours = list(range(24))
+        counts = [0] * 24
+        
+        for hour, count in hours_data:
+            counts[int(hour)] = count
+        
+        # Créer le graphique
+        plt.figure(figsize=(12, 6))
+        sns.barplot(x=hours, y=counts)
+        
+        plt.title('Peak Hours Analysis (Last 30 Days)')
+        plt.xlabel('Hour of Day (24h format)')
+        plt.ylabel('Number of Interactions')
+        plt.grid(True, alpha=0.3)
+        
+        # Trouver l'heure de pointe
+        peak_hour = hours[counts.index(max(counts))]
+        peak_count = max(counts)
+        
+        # Ajouter une ligne pour l'heure de pointe
+        plt.axvline(x=peak_hour, color='r', linestyle='--', alpha=0.5)
+        
+        # Sauvegarder le graphique
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        
+        # Calculer les statistiques
+        total_interactions = sum(counts)
+        avg_per_hour = total_interactions / 24
+        
+        # Trouver les 3 heures les plus actives
+        top_hours = sorted([(h, c) for h, c in zip(hours, counts)], 
+                         key=lambda x: x[1], 
+                         reverse=True)[:3]
+        
+        # Envoyer le graphique avec les stats
+        caption = f"""📊 Peak Hours Analysis (Last 30 Days)
+
+🔥 Most Active Hours:
+1. {top_hours[0][0]:02d}:00 - {top_hours[0][1]} interactions
+2. {top_hours[1][0]:02d}:00 - {top_hours[1][1]} interactions
+3. {top_hours[2][0]:02d}:00 - {top_hours[2][1]} interactions
+
+📈 Statistics:
+• Total interactions: {total_interactions}
+• Average per hour: {avg_per_hour:.1f}
+• Peak hour: {peak_hour:02d}:00 ({peak_count} interactions)"""
+        
+        update.message.reply_photo(
+            photo=buf,
+            caption=caption
+        )
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Erreur peak analysis: {str(e)}")
+        update.message.reply_text("❌ Error analyzing peak hours")
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -814,6 +901,9 @@ if __name__ == '__main__':
                 fallbacks=[CommandHandler('cancel', cancel)]
             )
             dp.add_handler(restore_handler)
+            
+            # Ajouter le handler pour peak
+            dp.add_handler(CommandHandler("peak", analyze_peak_hours))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
