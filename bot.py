@@ -39,6 +39,10 @@ Ready to multiply your social growth? Tap below! 👇"""
 # États de la conversation
 FEEDBACK = 0
 
+# États pour la réponse
+REPLY_ID = 0
+REPLY_MESSAGE = 1
+
 def init_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -218,6 +222,54 @@ def cancel(update: Update, context: CallbackContext):
     )
     return ConversationHandler.END
 
+def reply_start(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return ConversationHandler.END
+    
+    update.message.reply_text(
+        "📤 Reply to User\n\n"
+        "Please send the user's ID first\n"
+        "(You can find it in the feedback notification)\n\n"
+        "Cancel anytime with /cancel"
+    )
+    return REPLY_ID
+
+def reply_get_id(update: Update, context: CallbackContext):
+    try:
+        user_id = int(update.message.text)
+        context.user_data['reply_to'] = user_id
+        
+        update.message.reply_text(
+            "✅ User ID received.\n\n"
+            "Now send your response message:"
+        )
+        return REPLY_MESSAGE
+    except ValueError:
+        update.message.reply_text("❌ Invalid ID. Please send a valid user ID or /cancel")
+        return REPLY_ID
+
+def reply_send(update: Update, context: CallbackContext):
+    user_id = context.user_data.get('reply_to')
+    message = update.message.text
+    
+    try:
+        context.bot.send_message(
+            chat_id=user_id,
+            text=f"""📨 Response from EngageVault Support:
+
+{message}
+
+⚠️ Remember: Our team only communicates through this bot."""
+        )
+        
+        update.message.reply_text("✅ Response sent successfully!")
+    except Exception as e:
+        logger.error(f"Erreur envoi réponse: {str(e)}")
+        update.message.reply_text("❌ Error sending response. Please try again.")
+    
+    return ConversationHandler.END
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -238,6 +290,17 @@ if __name__ == '__main__':
                 fallbacks=[CommandHandler('cancel', cancel)]
             )
             dp.add_handler(feedback_handler)
+            
+            # Ajouter le handler pour les réponses
+            reply_handler = ConversationHandler(
+                entry_points=[CommandHandler('reply', reply_start)],
+                states={
+                    REPLY_ID: [MessageHandler(Filters.text & ~Filters.command, reply_get_id)],
+                    REPLY_MESSAGE: [MessageHandler(Filters.text & ~Filters.command, reply_send)]
+                },
+                fallbacks=[CommandHandler('cancel', cancel)]
+            )
+            dp.add_handler(reply_handler)
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
