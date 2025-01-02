@@ -3,6 +3,9 @@ from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationH
 import os
 import psycopg2
 import logging
+import csv
+from io import StringIO
+from datetime import datetime
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -401,6 +404,90 @@ Username | Commands | Feedbacks
         logger.error(f"Erreur users: {str(e)}")
         update.message.reply_text("❌ Error getting user list")
 
+def export_data(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Créer un buffer pour le CSV
+        output = StringIO()
+        writer = csv.writer(output)
+        
+        # Export des utilisateurs
+        cur.execute('''
+            SELECT 
+                b.user_id,
+                b.username,
+                b.commands,
+                COUNT(f.id) as feedback_count
+            FROM bot_stats b
+            LEFT JOIN feedbacks f ON b.user_id = f.user_id
+            GROUP BY b.user_id, b.username, b.commands
+        ''')
+        users = cur.fetchall()
+        
+        # Première partie : Stats utilisateurs
+        writer.writerow(['=== USER STATISTICS ==='])
+        writer.writerow(['User ID', 'Username', 'Commands', 'Feedbacks'])
+        writer.writerows(users)
+        writer.writerow([])  # Ligne vide pour séparer
+        
+        # Deuxième partie : Feedbacks
+        cur.execute('''
+            SELECT 
+                user_id,
+                username,
+                message,
+                created_at
+            FROM feedbacks
+            ORDER BY created_at DESC
+        ''')
+        feedbacks = cur.fetchall()
+        
+        writer.writerow(['=== FEEDBACK HISTORY ==='])
+        writer.writerow(['User ID', 'Username', 'Message', 'Date'])
+        writer.writerows(feedbacks)
+        
+        # Troisième partie : Statistiques globales
+        cur.execute('''
+            SELECT 
+                COUNT(DISTINCT user_id) as unique_users,
+                SUM(commands) as total_commands
+            FROM bot_stats
+        ''')
+        global_stats = cur.fetchone()
+        
+        writer.writerow([])
+        writer.writerow(['=== GLOBAL STATISTICS ==='])
+        writer.writerow(['Metric', 'Value'])
+        writer.writerow(['Unique Users', global_stats[0]])
+        writer.writerow(['Total Commands', global_stats[1]])
+        writer.writerow(['Total Feedbacks', len(feedbacks)])
+        
+        cur.close()
+        conn.close()
+        
+        # Préparer le fichier
+        output.seek(0)
+        date = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'bot_export_{date}.csv'
+        
+        # Envoyer le fichier
+        context.bot.send_document(
+            chat_id=update.effective_chat.id,
+            document=output.getvalue().encode(),
+            filename=filename,
+            caption="📊 Here's your complete bot data export"
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur export: {str(e)}")
+        update.message.reply_text("❌ Error generating export")
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -445,6 +532,9 @@ if __name__ == '__main__':
             
             # Ajouter le handler pour users
             dp.add_handler(CommandHandler("users", get_users))
+            
+            # Ajouter le handler pour export
+            dp.add_handler(CommandHandler("export", export_data))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
