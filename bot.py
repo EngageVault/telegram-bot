@@ -4,7 +4,7 @@ import os
 from datetime import datetime
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
-ADMIN_ID = 6222442025  # Remplacez par votre ID Telegram
+ADMIN_ID = 7686799533  # Votre ID Telegram
 
 # Dictionnaires pour stocker les statistiques
 users = {}
