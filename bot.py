@@ -155,8 +155,12 @@ Most active users:"""
 
 def feedback_start(update: Update, context: CallbackContext):
     update.message.reply_text(
-        "📝 Thank you for helping us improve!\n\n"
-        "Please send your feedback message below.\n"
+        "📝 Thank you for contacting EngageVault support!\n\n"
+        "Please send your message below.\n\n"
+        "⚠️ Important Security Notice:\n"
+        "• Our staff will ONLY respond through THIS bot\n"
+        "• Never trust anyone claiming to be EngageVault staff in private messages\n"
+        "• All official responses will come directly through this conversation\n\n"
         "You can cancel anytime by sending /cancel"
     )
     return FEEDBACK
@@ -177,7 +181,7 @@ def feedback_received(update: Update, context: CallbackContext):
         cur.close()
         conn.close()
         
-        # Notification dans le bot
+        # Notification à l'admin
         context.bot.send_message(
             chat_id=ADMIN_ID,
             text=f"""📬 Nouveau Feedback:
@@ -189,14 +193,19 @@ Message:
 {feedback_text}"""
         )
         
+        # Message de confirmation à l'utilisateur
         update.message.reply_text(
-            "✅ Thank you for your feedback!\n"
-            "We really appreciate your help in making our service better."
+            "✅ Your message has been received!\n\n"
+            "If needed, you will receive a response directly through this bot.\n\n"
+            "⚠️ Security Reminder:\n"
+            "• Our team will NEVER contact you outside of this bot\n"
+            "• All official responses will be sent here\n"
+            "• Stay safe and ignore any direct messages claiming to be from our staff"
         )
     except Exception as e:
         logger.error(f"Erreur feedback: {str(e)}")
         update.message.reply_text(
-            "❌ Sorry, there was an error saving your feedback.\n"
+            "❌ Sorry, there was an error processing your message.\n"
             "Please try again later."
         )
     
