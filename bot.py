@@ -51,35 +51,25 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-def create_buttons() -> InlineKeyboardMarkup:
-    """Crée les boutons inline avec les URLs"""
-    keyboard = [
-        [
-            InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)
-        ],
-        [
-            InlineKeyboardButton("🚀 Launch App", url=APP_URL)
-        ]
-    ]
-    return InlineKeyboardMarkup(keyboard)
-
 async def start_command(update: Update, context: CallbackContext) -> None:
     """
     Handler for the /start command.
     Sends a welcome message to the user with inline buttons.
     """
     try:
-        user = update.effective_user
-        logger.info(f"User {user.id} started the bot")
-        
-        # Créer les boutons
-        buttons = create_buttons()
-        
+        # Créer les boutons inline
+        keyboard = [
+            [InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)],
+            [InlineKeyboardButton("🚀 Launch App", url=APP_URL)]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+
         # Envoyer le message avec les boutons
         await update.message.reply_text(
             text=WELCOME_MESSAGE,
-            reply_markup=buttons
+            reply_markup=reply_markup
         )
+        
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
         await update.message.reply_text("An error occurred. Please try again later.")
