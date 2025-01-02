@@ -177,20 +177,17 @@ def feedback_received(update: Update, context: CallbackContext):
         cur.close()
         conn.close()
         
-        # Envoi en message privé
-        try:
-            context.bot.send_message(
-                chat_id=7686799533,  # Votre ID personnel
-                text=f"""📬 Nouveau Feedback:
+        # Notification dans le bot
+        context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"""📬 Nouveau Feedback:
 
 De: @{user.username or 'Anonymous'}
 ID: {user.id}
 
 Message:
 {feedback_text}"""
-            )
-        except Exception as e:
-            logger.error(f"Erreur envoi DM: {str(e)}")
+        )
         
         update.message.reply_text(
             "✅ Thank you for your feedback!\n"
