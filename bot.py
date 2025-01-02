@@ -88,17 +88,24 @@ def start(update: Update, context: CallbackContext):
         update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
 
 def get_stats(update: Update, context: CallbackContext):
-    if update.effective_user.id != ADMIN_ID:
+    logger.info("Commande stats reçue")
+    user_id = update.effective_user.id
+    logger.info(f"ID utilisateur: {user_id}")
+    
+    if user_id != ADMIN_ID:
+        logger.warning(f"Accès non autorisé de l'utilisateur {user_id}")
         update.message.reply_text("⛔ You don't have permission to use this command.")
         return
 
     try:
+        logger.info("Tentative de connexion à la base de données pour stats")
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute('SELECT total_starts FROM stats')
         total = cur.fetchone()[0]
         cur.close()
         conn.close()
+        logger.info(f"Stats récupérées: {total} starts")
         
         update.message.reply_text(f"📊 Total /start commands: {total}")
     except Exception as e:
