@@ -17,27 +17,29 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 def init_db():
     try:
-        logger.info("Connexion à la base de données...")
+        logger.info("Tentative d'initialisation de la base de données...")
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         
-        # Création d'une table simple pour les stats
+        # Création de la table stats
         cur.execute('''
             CREATE TABLE IF NOT EXISTS stats (
                 total_starts INTEGER DEFAULT 0
             )
         ''')
         
-        # Insérer une ligne si la table est vide
-        cur.execute('INSERT INTO stats SELECT 0 WHERE NOT EXISTS (SELECT 1 FROM stats)')
+        # Vérifier si la table est vide et l'initialiser si nécessaire
+        cur.execute('SELECT COUNT(*) FROM stats')
+        if cur.fetchone()[0] == 0:
+            cur.execute('INSERT INTO stats (total_starts) VALUES (0)')
         
         conn.commit()
         cur.close()
         conn.close()
-        logger.info("Base de données initialisée")
+        logger.info("Base de données initialisée avec succès")
         return True
     except Exception as e:
-        logger.error(f"Erreur base de données: {str(e)}")
+        logger.error(f"Erreur d'initialisation BD: {str(e)}")
         return False
 
 WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
@@ -111,15 +113,18 @@ def get_stats(update: Update, context: CallbackContext):
 
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
-    try:
-        updater = Updater(TOKEN)
-        updater.dispatcher.add_handler(CommandHandler("start", start))
-        updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
-        logger.info("Handlers ajoutés")
-        
-        logger.info("Démarrage du polling...")
-        updater.start_polling()
-        logger.info("Bot démarré avec succès")
-        updater.idle()
-    except Exception as e:
-        logger.error(f"Erreur critique au démarrage: {str(e)}")
+    if init_db():  # Initialiser la BD au démarrage
+        try:
+            updater = Updater(TOKEN)
+            updater.dispatcher.add_handler(CommandHandler("start", start))
+            updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
+            logger.info("Handlers ajoutés")
+            
+            logger.info("Démarrage du polling...")
+            updater.start_polling()
+            logger.info("Bot démarré avec succès")
+            updater.idle()
+        except Exception as e:
+            logger.error(f"Erreur critique au démarrage: {str(e)}")
+    else:
+        logger.error("Échec de l'initialisation de la base de données")
