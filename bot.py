@@ -624,25 +624,34 @@ def create_backup(update: Update, context: CallbackContext):
         # Informer que le backup commence
         status_message = update.message.reply_text("🔄 Creating database backup...")
         
-        # Créer le nom du fichier avec la date
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Créer un fichier SQL
+        backup_data = []
+        
+        # Sauvegarder bot_stats
+        cur.execute('SELECT * FROM bot_stats')
+        stats_data = cur.fetchall()
+        backup_data.append("-- Bot Stats Table\n")
+        for row in stats_data:
+            backup_data.append(f"INSERT INTO bot_stats (user_id, username, commands) VALUES ({row[0]}, '{row[1]}', {row[2]});\n")
+        
+        # Sauvegarder feedbacks
+        cur.execute('SELECT * FROM feedbacks')
+        feedback_data = cur.fetchall()
+        backup_data.append("\n-- Feedbacks Table\n")
+        for row in feedback_data:
+            backup_data.append(f"INSERT INTO feedbacks (id, user_id, username, message, created_at) VALUES ({row[0]}, {row[1]}, '{row[2]}', '{row[3]}', '{row[4]}');\n")
+        
+        # Créer le fichier
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         filename = f'backup_{timestamp}.sql'
         
-        # Créer le backup avec pg_dump
-        process = subprocess.Popen(
-            ['pg_dump', DATABASE_URL],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
-        
-        output, error = process.communicate()
-        
-        if process.returncode != 0:
-            raise Exception(f"Backup failed: {error.decode()}")
-        
-        # Créer un fichier temporaire
-        with open(filename, 'wb') as f:
-            f.write(output)
+        with open(filename, 'w') as f:
+            f.write("-- Database Backup\n")
+            f.write(f"-- Date: {timestamp}\n\n")
+            f.writelines(backup_data)
         
         # Envoyer le fichier
         with open(filename, 'rb') as f:
@@ -653,10 +662,14 @@ def create_backup(update: Update, context: CallbackContext):
                 caption=f"📦 Database Backup\n📅 {timestamp}"
             )
         
-        # Nettoyer le fichier temporaire
-        subprocess.run(['rm', filename])
+        # Nettoyer
+        import os
+        os.remove(filename)
         
-        # Mettre à jour le message de statut
+        cur.close()
+        conn.close()
+        
+        # Mettre à jour le message
         status_message.edit_text("✅ Backup completed and sent!")
         
     except Exception as e:
