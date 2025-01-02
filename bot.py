@@ -129,7 +129,15 @@ def get_stats(update: Update, context: CallbackContext):
         cur.execute('SELECT COUNT(*) FROM bot_stats')
         unique_users = cur.fetchone()[0] or 0
         
-        # Top 5
+        # Total des feedbacks
+        cur.execute('SELECT COUNT(*) FROM feedbacks')
+        total_feedbacks = cur.fetchone()[0] or 0
+        
+        # Utilisateurs uniques ayant envoyé un feedback
+        cur.execute('SELECT COUNT(DISTINCT user_id) FROM feedbacks')
+        unique_feedback_users = cur.fetchone()[0] or 0
+        
+        # Top 5 utilisateurs
         cur.execute('''
             SELECT username, commands 
             FROM bot_stats 
@@ -142,6 +150,10 @@ def get_stats(update: Update, context: CallbackContext):
 
 Total /start commands: {total_commands}
 Unique users: {unique_users}
+
+📬 Feedback Statistics:
+Total feedbacks: {total_feedbacks}
+Unique users feedback: {unique_feedback_users}
 
 Most active users:"""
 
