@@ -8,6 +8,7 @@ from io import StringIO
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import io
+import subprocess
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -614,6 +615,57 @@ def create_growth_graph(update: Update, context: CallbackContext):
         logger.error(f"Erreur growth graph: {str(e)}")
         update.message.reply_text("❌ Error generating growth graph")
 
+def create_backup(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        # Informer que le backup commence
+        status_message = update.message.reply_text("🔄 Creating database backup...")
+        
+        # Créer le nom du fichier avec la date
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'backup_{timestamp}.sql'
+        
+        # Créer le backup avec pg_dump
+        process = subprocess.Popen(
+            ['pg_dump', DATABASE_URL],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        output, error = process.communicate()
+        
+        if process.returncode != 0:
+            raise Exception(f"Backup failed: {error.decode()}")
+        
+        # Créer un fichier temporaire
+        with open(filename, 'wb') as f:
+            f.write(output)
+        
+        # Envoyer le fichier
+        with open(filename, 'rb') as f:
+            context.bot.send_document(
+                chat_id=update.effective_chat.id,
+                document=f,
+                filename=filename,
+                caption=f"📦 Database Backup\n📅 {timestamp}"
+            )
+        
+        # Nettoyer le fichier temporaire
+        subprocess.run(['rm', filename])
+        
+        # Mettre à jour le message de statut
+        status_message.edit_text("✅ Backup completed and sent!")
+        
+    except Exception as e:
+        logger.error(f"Erreur backup: {str(e)}")
+        update.message.reply_text(
+            "❌ Error creating backup\n"
+            "Please check the logs for details."
+        )
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -665,6 +717,9 @@ if __name__ == '__main__':
             # Ajouter les handlers pour les graphiques
             dp.add_handler(CommandHandler("activity", create_activity_graph))
             dp.add_handler(CommandHandler("growth", create_growth_graph))
+            
+            # Ajouter le handler pour backup
+            dp.add_handler(CommandHandler("backup", create_backup))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
