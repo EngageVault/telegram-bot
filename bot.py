@@ -9,7 +9,7 @@ import logging
 import platform
 import asyncio
 from typing import Final
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -26,8 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Constants
 TOKEN: Final = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
-COMMUNITY_URL: Final = "https://t.me/engagevaultcommunity"
-APP_URL: Final = "https://engagevault.com"  # À remplacer par l'URL de votre future app
 WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
@@ -50,37 +48,15 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-def get_keyboard() -> ReplyKeyboardMarkup:
-    """
-    Creates and returns the keyboard with buttons.
-    """
-    keyboard = [
-        [KeyboardButton("⭐ Join our Community")],
-        [KeyboardButton("🚀 Launch App")]
-    ]
-    return ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True,
-        one_time_keyboard=False
-    )
-
 async def start_command(update: Update, context: CallbackContext) -> None:
     """
     Handler for the /start command.
-    Sends a welcome message to the user with buttons.
+    Sends a welcome message to the user.
     """
     try:
         user = update.effective_user
         logger.info(f"User {user.id} started the bot")
-        
-        # Créer le clavier
-        reply_markup = get_keyboard()
-        
-        # Envoyer le message avec les boutons
-        await update.message.reply_text(
-            text=WELCOME_MESSAGE,
-            reply_markup=reply_markup
-        )
+        await update.message.reply_text(WELCOME_MESSAGE)
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
         await update.message.reply_text("An error occurred. Please try again later.")
