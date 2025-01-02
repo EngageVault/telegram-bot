@@ -1,5 +1,5 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, MessageHandler, Filters
 import os
 import psycopg2
 import logging
@@ -36,10 +36,15 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
+# États de la conversation
+FEEDBACK = 0
+
 def init_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
+        
+        # Table existante
         cur.execute('''
             CREATE TABLE IF NOT EXISTS bot_stats (
                 user_id BIGINT PRIMARY KEY,
@@ -47,6 +52,18 @@ def init_db():
                 commands INTEGER DEFAULT 1
             )
         ''')
+        
+        # Nouvelle table pour les feedbacks
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS feedbacks (
+                id SERIAL PRIMARY KEY,
+                user_id BIGINT,
+                username TEXT,
+                message TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         conn.commit()
         cur.close()
         conn.close()
@@ -136,13 +153,76 @@ Most active users:"""
         logger.error(f"Erreur stats: {str(e)}")
         update.message.reply_text("❌ Error getting statistics")
 
+def feedback_start(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "📝 Thank you for helping us improve!\n\n"
+        "Please send your feedback message below.\n"
+        "You can cancel anytime by sending /cancel"
+    )
+    return FEEDBACK
+
+def feedback_received(update: Update, context: CallbackContext):
+    user = update.effective_user
+    feedback_text = update.message.text
+    
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        cur.execute(
+            'INSERT INTO feedbacks (user_id, username, message) VALUES (%s, %s, %s)',
+            (user.id, user.username or "Anonymous", feedback_text)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+        
+        # Notifier l'admin
+        context.bot.send_message(
+            chat_id=ADMIN_ID,
+            text=f"📬 New Feedback:\n\nFrom: @{user.username or 'Anonymous'}\n\n{feedback_text}"
+        )
+        
+        update.message.reply_text(
+            "✅ Thank you for your feedback!\n"
+            "We really appreciate your help in making our service better."
+        )
+    except Exception as e:
+        logger.error(f"Erreur feedback: {str(e)}")
+        update.message.reply_text(
+            "❌ Sorry, there was an error saving your feedback.\n"
+            "Please try again later."
+        )
+    
+    return ConversationHandler.END
+
+def cancel(update: Update, context: CallbackContext):
+    update.message.reply_text(
+        "❌ Feedback cancelled.\n"
+        "Feel free to send your feedback anytime using /feedback"
+    )
+    return ConversationHandler.END
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
         try:
             updater = Updater(TOKEN)
-            updater.dispatcher.add_handler(CommandHandler("start", start))
-            updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
+            dp = updater.dispatcher
+            
+            # Handlers existants
+            dp.add_handler(CommandHandler("start", start))
+            dp.add_handler(CommandHandler("stats", get_stats))
+            
+            # Nouveau handler pour feedback
+            feedback_handler = ConversationHandler(
+                entry_points=[CommandHandler('feedback', feedback_start)],
+                states={
+                    FEEDBACK: [MessageHandler(Filters.text & ~Filters.command, feedback_received)]
+                },
+                fallbacks=[CommandHandler('cancel', cancel)]
+            )
+            dp.add_handler(feedback_handler)
+            
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
             updater.idle()
