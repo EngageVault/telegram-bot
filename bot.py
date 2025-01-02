@@ -9,7 +9,7 @@ import logging
 import platform
 import asyncio
 from typing import Final
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -50,33 +50,36 @@ Join now before regular rates apply! 🎁
 
 Ready to multiply your social growth? Tap below! 👇"""
 
-def get_keyboard() -> InlineKeyboardMarkup:
+def get_keyboard() -> ReplyKeyboardMarkup:
     """
-    Creates and returns the inline keyboard with buttons.
+    Creates and returns the keyboard with buttons.
     """
     keyboard = [
-        [InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)],
-        [InlineKeyboardButton("🚀 Launch App", url=APP_URL)]
+        [KeyboardButton("⭐ Join our Community")],
+        [KeyboardButton("🚀 Launch App")]
     ]
-    return InlineKeyboardMarkup(keyboard)
+    return ReplyKeyboardMarkup(
+        keyboard,
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
 
 async def start_command(update: Update, context: CallbackContext) -> None:
     """
     Handler for the /start command.
-    Sends a welcome message to the user with inline buttons.
+    Sends a welcome message to the user with buttons.
     """
     try:
         user = update.effective_user
         logger.info(f"User {user.id} started the bot")
         
-        # Créer le clavier inline
+        # Créer le clavier
         reply_markup = get_keyboard()
         
         # Envoyer le message avec les boutons
         await update.message.reply_text(
             text=WELCOME_MESSAGE,
-            reply_markup=reply_markup,
-            parse_mode='HTML'
+            reply_markup=reply_markup
         )
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
