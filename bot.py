@@ -52,6 +52,9 @@ REPLY_MESSAGE = 1
 # États pour le broadcast
 MESSAGE_TEXT = 0
 
+# États pour la restauration
+WAITING_FOR_FILE = 0
+
 def init_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -679,6 +682,74 @@ def create_backup(update: Update, context: CallbackContext):
             "Please check the logs for details."
         )
 
+def restore_start(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return ConversationHandler.END
+    
+    update.message.reply_text(
+        "📥 Please send the .sql backup file you want to restore.\n\n"
+        "⚠️ Warning: This will overwrite current data!\n"
+        "Cancel anytime with /cancel"
+    )
+    return WAITING_FOR_FILE
+
+def restore_file(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        return ConversationHandler.END
+    
+    try:
+        # Vérifier si un fichier a été envoyé
+        if not update.message.document:
+            update.message.reply_text("❌ Please send a .sql file")
+            return WAITING_FOR_FILE
+        
+        # Vérifier l'extension
+        if not update.message.document.file_name.endswith('.sql'):
+            update.message.reply_text("❌ Only .sql files are accepted")
+            return WAITING_FOR_FILE
+        
+        status_message = update.message.reply_text("🔄 Starting restoration...")
+        
+        # Télécharger le fichier
+        file = context.bot.get_file(update.message.document.file_id)
+        sql_content = file.download_as_bytearray().decode('utf-8')
+        
+        # Connexion à la BD
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Sauvegarder les données actuelles avant restauration
+        status_message.edit_text("🔄 Creating backup before restore...")
+        create_backup(update, context)
+        
+        # Vider les tables
+        status_message.edit_text("🔄 Clearing current data...")
+        cur.execute("DELETE FROM feedbacks")
+        cur.execute("DELETE FROM bot_stats")
+        
+        # Exécuter les requêtes de restauration
+        status_message.edit_text("🔄 Restoring data...")
+        cur.execute(sql_content)
+        conn.commit()
+        
+        cur.close()
+        conn.close()
+        
+        update.message.reply_text(
+            "✅ Restoration completed!\n"
+            "Use /stats to verify the data"
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur restore: {str(e)}")
+        update.message.reply_text(
+            "❌ Error during restoration\n"
+            "Previous backup has been kept safe"
+        )
+    
+    return ConversationHandler.END
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -733,6 +804,16 @@ if __name__ == '__main__':
             
             # Ajouter le handler pour backup
             dp.add_handler(CommandHandler("backup", create_backup))
+            
+            # Ajouter le handler pour restore
+            restore_handler = ConversationHandler(
+                entry_points=[CommandHandler('restore', restore_start)],
+                states={
+                    WAITING_FOR_FILE: [MessageHandler(Filters.document, restore_file)]
+                },
+                fallbacks=[CommandHandler('cancel', cancel)]
+            )
+            dp.add_handler(restore_handler)
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
