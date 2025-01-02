@@ -32,7 +32,7 @@ WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
 
-You've just discovered the next big thing in social media growth, and you're among the first to join! 🎯
+You've just discovered the next big thing in social media growth - and you're among the first to join! 🎯
 
 💎 Being an early member means:
 • EXCLUSIVE ACCESS to premium features
@@ -55,10 +55,8 @@ def get_keyboard() -> InlineKeyboardMarkup:
     Creates and returns the inline keyboard with buttons.
     """
     keyboard = [
-        [
-            InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL),
-            InlineKeyboardButton("🚀 Launch App", url=APP_URL)
-        ]
+        [InlineKeyboardButton("⭐ Join our Community", url=COMMUNITY_URL)],
+        [InlineKeyboardButton("🚀 Launch App", url=APP_URL)]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -70,9 +68,15 @@ async def start_command(update: Update, context: CallbackContext) -> None:
     try:
         user = update.effective_user
         logger.info(f"User {user.id} started the bot")
+        
+        # Créer le clavier inline
+        reply_markup = get_keyboard()
+        
+        # Envoyer le message avec les boutons
         await update.message.reply_text(
             text=WELCOME_MESSAGE,
-            reply_markup=get_keyboard()
+            reply_markup=reply_markup,
+            parse_mode='HTML'
         )
     except Exception as e:
         logger.error(f"Error in start command: {str(e)}")
