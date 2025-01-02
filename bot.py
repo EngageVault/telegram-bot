@@ -11,6 +11,8 @@ import io
 import subprocess
 import seaborn as sns
 from collections import defaultdict
+import pandas as pd
+import numpy as np
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -837,6 +839,115 @@ def analyze_peak_hours(update: Update, context: CallbackContext):
         logger.error(f"Erreur peak analysis: {str(e)}")
         update.message.reply_text("❌ Error analyzing peak hours")
 
+def analyze_retention(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer les données d'utilisation
+        cur.execute('''
+            SELECT 
+                user_id,
+                username,
+                MIN(created_at) as first_seen,
+                MAX(created_at) as last_seen,
+                COUNT(*) as total_interactions
+            FROM feedbacks
+            GROUP BY user_id, username
+            ORDER BY first_seen
+        ''')
+        
+        user_data = cur.fetchall()
+        
+        if not user_data:
+            update.message.reply_text("No data available for retention analysis.")
+            return
+        
+        # Préparer les données
+        retention_data = {
+            '1_day': 0,
+            '7_days': 0,
+            '30_days': 0
+        }
+        
+        total_users = len(user_data)
+        now = datetime.now()
+        
+        for user in user_data:
+            first_seen = user[2]
+            last_seen = user[3]
+            delta = last_seen - first_seen
+            
+            if delta.days >= 1:
+                retention_data['1_day'] += 1
+            if delta.days >= 7:
+                retention_data['7_days'] += 1
+            if delta.days >= 30:
+                retention_data['30_days'] += 1
+        
+        # Créer le graphique
+        periods = ['1 Day', '7 Days', '30 Days']
+        rates = [
+            (retention_data['1_day'] / total_users) * 100,
+            (retention_data['7_days'] / total_users) * 100,
+            (retention_data['30_days'] / total_users) * 100
+        ]
+        
+        plt.figure(figsize=(10, 6))
+        bars = plt.bar(periods, rates)
+        
+        # Ajouter les pourcentages sur les barres
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(bar.get_x() + bar.get_width()/2., height,
+                    f'{height:.1f}%',
+                    ha='center', va='bottom')
+        
+        plt.title('User Retention Analysis')
+        plt.xlabel('Time Period')
+        plt.ylabel('Retention Rate (%)')
+        plt.ylim(0, 100)
+        
+        # Sauvegarder le graphique
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        
+        # Statistiques supplémentaires
+        avg_interactions = sum(u[4] for u in user_data) / total_users
+        active_last_week = sum(1 for u in user_data if (now - u[3]).days <= 7)
+        
+        caption = f"""📊 Retention Analysis
+
+🔄 Retention Rates:
+• After 1 day: {rates[0]:.1f}%
+• After 7 days: {rates[1]:.1f}%
+• After 30 days: {rates[2]:.1f}%
+
+📈 Additional Stats:
+• Total users analyzed: {total_users}
+• Average interactions per user: {avg_interactions:.1f}
+• Active users (last 7 days): {active_last_week}
+
+ℹ️ This analysis shows how many users remain active after their first interaction."""
+        
+        update.message.reply_photo(
+            photo=buf,
+            caption=caption
+        )
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Erreur retention analysis: {str(e)}")
+        update.message.reply_text("❌ Error analyzing retention")
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -904,6 +1015,9 @@ if __name__ == '__main__':
             
             # Ajouter le handler pour peak
             dp.add_handler(CommandHandler("peak", analyze_peak_hours))
+            
+            # Ajouter le handler pour retention
+            dp.add_handler(CommandHandler("retention", analyze_retention))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
