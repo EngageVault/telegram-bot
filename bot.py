@@ -41,16 +41,36 @@ Ready to multiply your social growth? Tap below! 👇"""
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Gestionnaire de la commande /start"""
-    keyboard = [
-        [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-        [InlineKeyboardButton("🚀 Launch App", url="https://engagevault.com")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # Création des boutons
+    buttons = [[
+        InlineKeyboardButton(
+            text="⭐ Join our Community",
+            url="https://t.me/engagevaultcommunity"
+        )
+    ], [
+        InlineKeyboardButton(
+            text="🚀 Launch App",
+            url="https://engagevault.com"
+        )
+    ]]
     
-    await update.message.reply_text(
-        text=WELCOME_MESSAGE,
-        reply_markup=reply_markup
-    )
+    # Création du markup
+    keyboard = InlineKeyboardMarkup(buttons)
+    
+    try:
+        # Envoi du message avec les boutons
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=WELCOME_MESSAGE,
+            reply_markup=keyboard,
+            parse_mode='HTML'
+        )
+    except Exception as e:
+        print(f"Error: {e}")
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Une erreur s'est produite."
+        )
 
 def main():
     """Fonction principale"""
@@ -62,7 +82,7 @@ def main():
 
     # Démarrer le bot
     print("Le bot démarre...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling()
     print("Bot arrêté")
 
 if __name__ == "__main__":
