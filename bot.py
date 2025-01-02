@@ -5,7 +5,9 @@ import psycopg2
 import logging
 import csv
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import io
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -488,6 +490,130 @@ def export_data(update: Update, context: CallbackContext):
         logger.error(f"Erreur export: {str(e)}")
         update.message.reply_text("❌ Error generating export")
 
+def create_activity_graph(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer l'activité des 7 derniers jours
+        cur.execute('''
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM feedbacks
+            WHERE created_at >= NOW() - INTERVAL '7 days'
+            GROUP BY DATE(created_at)
+            ORDER BY date
+        ''')
+        activity_data = cur.fetchall()
+        
+        # Préparer les données pour le graphique
+        dates = []
+        counts = []
+        
+        # Remplir avec tous les jours, même ceux sans activité
+        for i in range(7):
+            date = datetime.now().date() - timedelta(days=6-i)
+            count = 0
+            for d, c in activity_data:
+                if d == date:
+                    count = c
+                    break
+            dates.append(date.strftime('%d/%m'))
+            counts.append(count)
+        
+        # Créer le graphique
+        plt.figure(figsize=(10, 6))
+        plt.plot(dates, counts, marker='o')
+        plt.title('Daily Activity (Last 7 Days)')
+        plt.xlabel('Date')
+        plt.ylabel('Number of Interactions')
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        
+        # Sauvegarder le graphique
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        
+        # Envoyer le graphique
+        update.message.reply_photo(
+            photo=buf,
+            caption="📊 Activity graph for the last 7 days"
+        )
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Erreur activity graph: {str(e)}")
+        update.message.reply_text("❌ Error generating activity graph")
+
+def create_growth_graph(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer la croissance des utilisateurs
+        cur.execute('''
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(DISTINCT user_id) as users
+            FROM feedbacks
+            GROUP BY DATE(created_at)
+            ORDER BY date
+        ''')
+        growth_data = cur.fetchall()
+        
+        if not growth_data:
+            update.message.reply_text("No data available for growth graph.")
+            return
+        
+        # Préparer les données
+        dates = [d.strftime('%d/%m') for d, _ in growth_data]
+        users = []
+        total = 0
+        for _, count in growth_data:
+            total += count
+            users.append(total)
+        
+        # Créer le graphique
+        plt.figure(figsize=(10, 6))
+        plt.plot(dates, users, marker='o', color='green')
+        plt.title('User Growth Over Time')
+        plt.xlabel('Date')
+        plt.ylabel('Total Users')
+        plt.grid(True)
+        plt.xticks(rotation=45)
+        
+        # Sauvegarder le graphique
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        plt.close()
+        
+        # Envoyer le graphique
+        update.message.reply_photo(
+            photo=buf,
+            caption=f"📈 Growth graph\nTotal users: {total}"
+        )
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Erreur growth graph: {str(e)}")
+        update.message.reply_text("❌ Error generating growth graph")
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -535,6 +661,10 @@ if __name__ == '__main__':
             
             # Ajouter le handler pour export
             dp.add_handler(CommandHandler("export", export_data))
+            
+            # Ajouter les handlers pour les graphiques
+            dp.add_handler(CommandHandler("activity", create_activity_graph))
+            dp.add_handler(CommandHandler("growth", create_growth_graph))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
