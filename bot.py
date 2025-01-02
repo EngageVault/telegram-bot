@@ -43,6 +43,9 @@ FEEDBACK = 0
 REPLY_ID = 0
 REPLY_MESSAGE = 1
 
+# États pour le broadcast
+MESSAGE_TEXT = 0
+
 def init_db():
     try:
         conn = psycopg2.connect(DATABASE_URL)
@@ -282,6 +285,68 @@ def reply_send(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
+def message_start(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return ConversationHandler.END
+    
+    update.message.reply_text(
+        "📢 Broadcast Message\n\n"
+        "Please send the message you want to broadcast to all users.\n"
+        "Cancel anytime with /cancel"
+    )
+    return MESSAGE_TEXT
+
+def message_send(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        return ConversationHandler.END
+        
+    broadcast_text = update.message.text
+    success_count = 0
+    fail_count = 0
+    
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer tous les utilisateurs uniques
+        cur.execute('SELECT DISTINCT user_id FROM bot_stats')
+        users = cur.fetchall()
+        
+        for user in users:
+            try:
+                context.bot.send_message(
+                    chat_id=user[0],
+                    text=f"""📢 Message from EngageVault:
+
+{broadcast_text}
+
+⚠️ Official message sent through this bot only."""
+                )
+                success_count += 1
+            except Exception as e:
+                logger.error(f"Erreur envoi broadcast à {user[0]}: {str(e)}")
+                fail_count += 1
+        
+        cur.close()
+        conn.close()
+        
+        # Rapport d'envoi
+        update.message.reply_text(
+            f"""✅ Broadcast completed!
+
+📊 Statistics:
+• Successfully sent: {success_count}
+• Failed: {fail_count}
+• Total attempted: {success_count + fail_count}"""
+        )
+        
+    except Exception as e:
+        logger.error(f"Erreur broadcast: {str(e)}")
+        update.message.reply_text("❌ Error sending broadcast message")
+    
+    return ConversationHandler.END
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -313,6 +378,16 @@ if __name__ == '__main__':
                 fallbacks=[CommandHandler('cancel', cancel)]
             )
             dp.add_handler(reply_handler)
+            
+            # Ajouter le handler pour le broadcast
+            message_handler = ConversationHandler(
+                entry_points=[CommandHandler('message', message_start)],
+                states={
+                    MESSAGE_TEXT: [MessageHandler(Filters.text & ~Filters.command, message_send)]
+                },
+                fallbacks=[CommandHandler('cancel', cancel)]
+            )
+            dp.add_handler(message_handler)
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
