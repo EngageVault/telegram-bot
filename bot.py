@@ -16,7 +16,7 @@ logging.basicConfig(
 # Token du bot
 TOKEN = "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg"
 
-# Messages et URLs
+# Message de bienvenue
 WELCOME_MESSAGE = """🚀 Welcome to EngageVault!
 
 ⭐ Congratulations Early Adopter! ⭐
@@ -40,50 +40,23 @@ Join now before regular rates apply! 🎁
 Ready to multiply your social growth? Tap below! 👇"""
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Gestionnaire de la commande /start"""
-    # Création des boutons
-    buttons = [[
-        InlineKeyboardButton(
-            text="⭐ Join our Community",
-            url="https://t.me/engagevaultcommunity"
-        )
-    ], [
-        InlineKeyboardButton(
-            text="🚀 Launch App",
-            url="https://engagevault.com"
-        )
-    ]]
-    
-    # Création du markup
-    keyboard = InlineKeyboardMarkup(buttons)
-    
-    try:
-        # Envoi du message avec les boutons
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=WELCOME_MESSAGE,
-            reply_markup=keyboard,
-            parse_mode='HTML'
-        )
-    except Exception as e:
-        print(f"Error: {e}")
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Une erreur s'est produite."
-        )
+    keyboard = [
+        [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
+        [InlineKeyboardButton("🚀 Launch App", url="https://engagevault.com")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(text=WELCOME_MESSAGE, reply_markup=reply_markup)
 
 def main():
-    """Fonction principale"""
     # Créer l'application
     app = Application.builder().token(TOKEN).build()
-
-    # Ajouter le gestionnaire de commande
+    
+    # Ajouter la commande /start
     app.add_handler(CommandHandler("start", start))
-
+    
     # Démarrer le bot
-    print("Le bot démarre...")
+    print("Bot started...")
     app.run_polling()
-    print("Bot arrêté")
 
 if __name__ == "__main__":
     main()
