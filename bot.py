@@ -1,7 +1,7 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Updater, CommandHandler, CallbackContext
 import os
-import psycopg2
+import json
 import logging
 
 logging.basicConfig(
@@ -12,51 +12,52 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
 ADMIN_ID = 7686799533
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-def init_db():
+# Structure pour sauvegarder les données
+DATA = {
+    "start_count": 0,
+    "unique_users": set(),
+    "user_stats": {}
+}
+
+# Charger les données au démarrage
+def load_data():
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        
-        # Une seule table simple
-        cur.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                user_id BIGINT,
-                username TEXT,
-                commands INTEGER DEFAULT 1
-            )
-        ''')
-        
-        conn.commit()
-        cur.close()
-        conn.close()
-        return True
+        with open('bot_data.json', 'r') as f:
+            data = json.load(f)
+            DATA["start_count"] = data["start_count"]
+            DATA["unique_users"] = set(data["unique_users"])
+            DATA["user_stats"] = data["user_stats"]
+    except:
+        logger.info("Aucune donnée précédente trouvée")
+
+# Sauvegarder les données
+def save_data():
+    try:
+        data = {
+            "start_count": DATA["start_count"],
+            "unique_users": list(DATA["unique_users"]),
+            "user_stats": DATA["user_stats"]
+        }
+        with open('bot_data.json', 'w') as f:
+            json.dump(data, f)
     except Exception as e:
-        logger.error(f"Erreur BD: {str(e)}")
-        return False
+        logger.error(f"Erreur sauvegarde: {str(e)}")
 
 def start(update: Update, context: CallbackContext):
     try:
         user = update.effective_user
-        user_id = user.id
+        user_id = str(user.id)  # Convertir en string pour JSON
         username = user.username or "Anonymous"
         
-        # Mettre à jour les stats
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
+        DATA["start_count"] += 1
+        DATA["unique_users"].add(user_id)
         
-        # Insérer ou mettre à jour l'utilisateur
-        cur.execute('''
-            INSERT INTO users (user_id, username, commands)
-            VALUES (%s, %s, 1)
-            ON CONFLICT (user_id) 
-            DO UPDATE SET commands = users.commands + 1
-        ''', (user_id, username))
+        if user_id not in DATA["user_stats"]:
+            DATA["user_stats"][user_id] = {"username": username, "commands": 0}
+        DATA["user_stats"][user_id]["commands"] += 1
         
-        conn.commit()
-        cur.close()
-        conn.close()
+        save_data()  # Sauvegarder après chaque modification
         
         keyboard = [
             [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
@@ -64,15 +65,9 @@ def start(update: Update, context: CallbackContext):
         ]
         
         update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
-        
+        logger.info("Message envoyé")
     except Exception as e:
         logger.error(f"Erreur: {str(e)}")
-        # Envoyer quand même le message si la BD échoue
-        keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
-        ]
-        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
 
 def get_stats(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
@@ -80,52 +75,38 @@ def get_stats(update: Update, context: CallbackContext):
         return
 
     try:
-        conn = psycopg2.connect(DATABASE_URL)
-        cur = conn.cursor()
-        
-        # Total des commandes
-        cur.execute('SELECT SUM(commands) FROM users')
-        total_commands = cur.fetchone()[0] or 0
-        
-        # Nombre d'utilisateurs uniques
-        cur.execute('SELECT COUNT(*) FROM users')
-        unique_users = cur.fetchone()[0] or 0
-        
-        # Top 5 utilisateurs
-        cur.execute('''
-            SELECT username, commands 
-            FROM users 
-            ORDER BY commands DESC 
-            LIMIT 5
-        ''')
-        top_users = cur.fetchall()
+        # Trier les utilisateurs par nombre de commandes
+        sorted_users = sorted(
+            DATA["user_stats"].items(),
+            key=lambda x: x[1]["commands"],
+            reverse=True
+        )[:5]
         
         stats_message = f"""📊 Bot Statistics:
 
-Total /start commands: {total_commands}
-Unique users: {unique_users}
+Total /start commands: {DATA["start_count"]}
+Unique users: {len(DATA["unique_users"])}
 
 Most active users:"""
 
-        for username, commands in top_users:
+        for _, stats in sorted_users:
+            username = stats["username"]
+            commands = stats["commands"]
             stats_message += f"\n@{username}: {commands} commands"
-        
+
         update.message.reply_text(stats_message)
-        
-        cur.close()
-        conn.close()
     except Exception as e:
         logger.error(f"Erreur stats: {str(e)}")
-        update.message.reply_text("❌ Error getting statistics")
 
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
-    if init_db():
+    load_data()  # Charger les données au démarrage
+    try:
         updater = Updater(TOKEN)
         updater.dispatcher.add_handler(CommandHandler("start", start))
         updater.dispatcher.add_handler(CommandHandler("stats", get_stats))
         logger.info("Bot prêt à démarrer")
         updater.start_polling()
         updater.idle()
-    else:
-        logger.error("Erreur d'initialisation de la base de données")
+    except Exception as e:
+        logger.error(f"Erreur critique au démarrage: {str(e)}")
