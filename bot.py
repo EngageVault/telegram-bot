@@ -166,6 +166,7 @@ def feedback_received(update: Update, context: CallbackContext):
     feedback_text = update.message.text
     
     try:
+        # Sauvegarde en BD
         conn = psycopg2.connect(DATABASE_URL)
         cur = conn.cursor()
         cur.execute(
@@ -176,11 +177,20 @@ def feedback_received(update: Update, context: CallbackContext):
         cur.close()
         conn.close()
         
-        # Notifier l'admin
-        context.bot.send_message(
-            chat_id=ADMIN_ID,
-            text=f"📬 New Feedback:\n\nFrom: @{user.username or 'Anonymous'}\n\n{feedback_text}"
-        )
+        # Envoi en message privé
+        try:
+            context.bot.send_message(
+                chat_id=7686799533,  # Votre ID personnel
+                text=f"""📬 Nouveau Feedback:
+
+De: @{user.username or 'Anonymous'}
+ID: {user.id}
+
+Message:
+{feedback_text}"""
+            )
+        except Exception as e:
+            logger.error(f"Erreur envoi DM: {str(e)}")
         
         update.message.reply_text(
             "✅ Thank you for your feedback!\n"
