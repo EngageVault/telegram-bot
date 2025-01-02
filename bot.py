@@ -347,6 +347,60 @@ def message_send(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
+def get_users(update: Update, context: CallbackContext):
+    if update.effective_user.id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        cur = conn.cursor()
+        
+        # Récupérer les utilisateurs avec leurs stats
+        cur.execute('''
+            SELECT 
+                b.username,
+                b.commands,
+                COUNT(f.id) as feedback_count
+            FROM bot_stats b
+            LEFT JOIN feedbacks f ON b.user_id = f.user_id
+            GROUP BY b.user_id, b.username, b.commands
+            ORDER BY b.commands DESC
+            LIMIT 10
+        ''')
+        users = cur.fetchall()
+        
+        users_message = """👥 Recent Users:
+
+Username | Commands | Feedbacks
+---------------------------"""
+
+        for username, commands, feedback_count in users:
+            users_message += f"\n@{username}: {commands} cmds, {feedback_count} fb"
+        
+        # Statistiques supplémentaires
+        cur.execute('SELECT COUNT(*) FROM bot_stats')
+        total_users = cur.fetchone()[0]
+        
+        cur.execute('SELECT COUNT(*) FROM bot_stats WHERE commands > 1')
+        returning_users = cur.fetchone()[0]
+        
+        users_message += f"""
+
+📊 User Statistics:
+• Total users: {total_users}
+• Returning users: {returning_users}
+• Shown above: Top 10 most active"""
+        
+        update.message.reply_text(users_message)
+        
+        cur.close()
+        conn.close()
+        
+    except Exception as e:
+        logger.error(f"Erreur users: {str(e)}")
+        update.message.reply_text("❌ Error getting user list")
+
 if __name__ == '__main__':
     logger.info("Démarrage du bot...")
     if init_db():
@@ -388,6 +442,9 @@ if __name__ == '__main__':
                 fallbacks=[CommandHandler('cancel', cancel)]
             )
             dp.add_handler(message_handler)
+            
+            # Ajouter le handler pour users
+            dp.add_handler(CommandHandler("users", get_users))
             
             logger.info("Bot prêt à démarrer")
             updater.start_polling()
