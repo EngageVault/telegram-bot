@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 
 TOKEN = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
+ADMIN_ID = 6222442025  # Remplacez par votre ID Telegram
 
 # Dictionnaires pour stocker les statistiques
 users = {}
@@ -35,11 +36,9 @@ Join now before regular rates apply! 🎁
 Ready to multiply your social growth? Tap below! 👇"""
 
 def start(update: Update, context: CallbackContext):
-    # Récupérer l'ID de l'utilisateur
     user_id = update.effective_user.id
     username = update.effective_user.username
     
-    # Mettre à jour les statistiques
     stats['total_starts'] += 1
     if user_id not in users:
         users[user_id] = {
@@ -51,7 +50,6 @@ def start(update: Update, context: CallbackContext):
     
     users[user_id]['commands_used'] += 1
 
-    # Message normal
     keyboard = [
         [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
         [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
@@ -59,14 +57,19 @@ def start(update: Update, context: CallbackContext):
     update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
 
 def get_stats(update: Update, context: CallbackContext):
-    # Commande pour voir les statistiques
+    user_id = update.effective_user.id
+    
+    # Vérifie si l'utilisateur est admin
+    if user_id != ADMIN_ID:
+        update.message.reply_text("⛔ You don't have permission to use this command.")
+        return
+
     stats_message = f"""📊 Bot Statistics:
 
 Total /start commands: {stats['total_starts']}
 Unique users: {stats['unique_users']}
 Most active users:"""
 
-    # Trouver les utilisateurs les plus actifs
     sorted_users = sorted(users.items(), key=lambda x: x[1]['commands_used'], reverse=True)[:5]
     
     for user_id, user_data in sorted_users:
