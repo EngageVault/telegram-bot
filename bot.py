@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Constants
 TOKEN: Final = os.getenv("TELEGRAM_TOKEN", "7929001260:AAG_EZTbt3C11GCZauaLqkuP99YKkxB1NJg")
 COMMUNITY_URL: Final = "https://t.me/engagevaultcommunity"
-APP_URL: Final = "https://engagevault.com"  # À remplacer par l'URL de votre future app
+APP_URL: Final = "https://engagevault.com"
 
 WELCOME_MESSAGE: Final = """🚀 Welcome to EngageVault!
 
@@ -87,7 +87,8 @@ def init_bot() -> Application:
     Returns the configured application instance.
     """
     try:
-        app = Application.builder().token(TOKEN).build()
+        # Ajout du drop_pending_updates=True pour éviter les conflits
+        app = Application.builder().token(TOKEN).arbitrary_callback_data(True).drop_pending_updates(True).build()
         
         # Add command handlers
         app.add_handler(CommandHandler("start", start_command))
@@ -109,7 +110,7 @@ async def main() -> None:
         app = init_bot()
         await app.initialize()
         await app.start()
-        await app.run_polling()
+        await app.run_polling(drop_pending_updates=True)
     except Exception as e:
         logger.critical(f"Critical error: {str(e)}")
     finally:
