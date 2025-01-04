@@ -1,0 +1,15 @@
+Pour tous les utilisateurs :
+/start - Démarrer le bot
+/feedback - Envoyer un feedback
+Pour l'admin uniquement :
+/stats - Voir les statistiques générales
+/message - Envoyer un broadcast à tous
+/users - Liste des utilisateurs actifs
+/export - Exporter les données en CSV
+/reply - Répondre à un feedback
+/activity - Graphique d'activité quotidienne
+7. /growth - Courbe de croissance
+/backup - Sauvegarder la base de données
+/restore - Restaurer une sauvegarde
+/peak - Analyse des heures de pointe
+/retention - Analyse de la rétention
