@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from telegram.ext import Updater, CommandHandler, CallbackContext, ConversationHandler, MessageHandler, Filters
 import os
 import psycopg2
@@ -113,20 +113,35 @@ def start(update: Update, context: CallbackContext):
         conn.close()
 
         keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
+            [InlineKeyboardButton(
+                "🌐 Ouvrir Web App", 
+                web_app=WebAppInfo(url="VOTRE_URL_WEBAPP")
+            )]
         ]
-        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        update.message.reply_text(
+            "Welcome to EngageVault!\n"
+            "Click below to open the web application:",
+            reply_markup=reply_markup
+        )
         logger.info(f"Start command from {username}")
         
     except Exception as e:
         logger.error(f"Erreur start: {str(e)}")
         # Envoyer quand même le message si la BD échoue
         keyboard = [
-            [InlineKeyboardButton("⭐ Join our Community", url="https://t.me/engagevaultcommunity")],
-            [InlineKeyboardButton("🚀 Launch App", url="https://google.com")]
+            [InlineKeyboardButton(
+                "🌐 Ouvrir Web App", 
+                web_app=WebAppInfo(url="VOTRE_URL_WEBAPP")
+            )]
         ]
-        update.message.reply_text(WELCOME_MESSAGE, reply_markup=InlineKeyboardMarkup(keyboard))
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        update.message.reply_text(
+            "Welcome to EngageVault!\n"
+            "Click below to open the web application:",
+            reply_markup=reply_markup
+        )
 
 def get_stats(update: Update, context: CallbackContext):
     if update.effective_user.id != ADMIN_ID:
