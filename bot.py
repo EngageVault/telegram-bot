@@ -2,7 +2,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, CallbackContext
 
-def start(update: Update, context: CallbackContext):
+async def start(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton(
             "🌐 Ouvrir Web App", 
